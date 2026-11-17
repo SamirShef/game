@@ -1,2 +1,3 @@
 # Game
+
 This is a Parkour and Historical Fiction Action-Adventure inspired by Assassin's Creed. This is an AI-assisted game (AI helps with understanding parkour mechanics and the processes behind creating large-scale games; nearly all of the code and content is being produced by me alone) that I am developing solo. I’m a fan of the early *Assassin’s Creed* games and wanted to craft a story of my own. The game is set in Renaissance Italy, where the protagonist, Pietro, loses his loved ones at a young age. Left an orphan, he embarks on a path of war and vengeance, seeking to eventually find peace and a quiet, happy life with his beloved, Katya.
