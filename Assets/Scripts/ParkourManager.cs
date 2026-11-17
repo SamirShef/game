@@ -20,11 +20,9 @@ public class ParkourManager : MonoBehaviour
 
     private ParkourNode currentNode = null;
     private Vector3 currentAnchorPoint = Vector3.zero;
-    private const float transferRotationSpeed = 90f;
+    private const float transferRotationSpeed = 180f;
     private const float transferMovingSpeed = 3f;
-
     private const float shimmySpeed = 2f;
-    private float shimmyProgress = 0f;
 
     private struct ParkourEdgeCandidate
     {
@@ -176,10 +174,13 @@ public class ParkourManager : MonoBehaviour
             }
 
             Vector3 fromPos = currentNode.PointAt((edge.FromRange.From + edge.FromRange.To) / 2);
-            Vector3 dir = edge.GetDirection(fromPos);
-            Debug.DrawRay(fromPos, dir, Color.magenta);
+            Vector3 rawDir = edge.GetDirection(fromPos);
             Debug.DrawRay(fromPos, moveVec, Color.blue);
-            float distance = dir.magnitude;
+            float distance = rawDir.magnitude;
+            rawDir.Normalize();
+
+            Vector3 dir = rawDir + currentNode.Normal * Mathf.Abs(Vector3.Dot(rawDir, currentNode.Normal));
+            Debug.DrawRay(fromPos, dir, Color.magenta);
             dir.Normalize();
 
             float dot = Vector3.Dot(dir, moveVec);
