@@ -21,10 +21,12 @@ public class ParkourNode : MonoBehaviour
     public List<ParkourEdge> OutgoingEdges => outgoingEdges;
 
     public Vector3 Normal => normalVector;
+    public Vector3 GlobalNormal => transform.TransformDirection(Normal);
     public Vector3 Right => rightVector;
+    public Vector3 GlobalRight => transform.TransformDirection(Right);
     public float Length => length;
-    public Vector3 Start => transform.position - Length / 2 * Right; // Left point
-    public Vector3 End => transform.position + Length / 2 * Right;   // Right point
+    public Vector3 Start => transform.position - Length / 2 * GlobalRight; // Left point
+    public Vector3 End => transform.position + Length / 2 * GlobalRight;   // Right point
 
     private void Awake()
     {
@@ -50,8 +52,8 @@ public class ParkourNode : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, 0.2f);
         if (Length != 0)
         {
-            Gizmos.DrawRay(transform.position, Length / 2 * Right);
-            Gizmos.DrawRay(transform.position, -Length / 2 * Right);
+            Gizmos.DrawRay(transform.position, Length / 2 * GlobalRight);
+            Gizmos.DrawRay(transform.position, -Length / 2 * GlobalRight);
         }
 
         foreach (var edge in OutgoingEdges)
@@ -76,7 +78,7 @@ public class ParkourNode : MonoBehaviour
         }
     }
 
-    public Vector3 PointAt(float s) => Start + Right * s;
-    public float Project(Vector3 p) => Mathf.Clamp(Vector3.Dot(p - Start, Right), 0, Length);
+    public Vector3 PointAt(float s) => Start + GlobalRight * s;
+    public float Project(Vector3 p) => Mathf.Clamp(Vector3.Dot(p - Start, GlobalRight), 0, Length);
     public Vector3 PointAtProject(Vector3 p) => PointAt(Project(p));
 }
