@@ -156,6 +156,7 @@ public class ParkourManager : MonoBehaviour
         float inputY = Input.GetAxisRaw("Vertical");
         float inputX = Input.GetAxisRaw("Horizontal");
         Vector3 moveVec = (currentNode.transform.right * inputX + currentNode.transform.up * inputY).normalized;
+        Vector3 globalNormal = currentNode.transform.TransformDirection(currentNode.Normal);
 
         if (currentNode.Length != 0)
         {
@@ -179,7 +180,7 @@ public class ParkourManager : MonoBehaviour
             float distance = rawDir.magnitude;
             rawDir.Normalize();
 
-            Vector3 dir = rawDir + currentNode.Normal * Mathf.Abs(Vector3.Dot(rawDir, currentNode.Normal));
+            Vector3 dir = rawDir - globalNormal * Vector3.Dot(rawDir, globalNormal);
             Debug.DrawRay(fromPos, dir, Color.magenta);
             dir.Normalize();
 
