@@ -155,17 +155,7 @@ public class ParkourManager : MonoBehaviour
 
         float inputY = Input.GetAxisRaw("Vertical");
         float inputX = Input.GetAxisRaw("Horizontal");
-        Vector3 moveVec = (currentNode.transform.right * inputX + currentNode.transform.up * inputY).normalized;
-        Vector3 globalNormal = currentNode.transform.TransformDirection(currentNode.Normal);
-
-        if (currentNode.Length != 0)
-        {
-            if (Mathf.Abs(Vector3.Dot(moveVec, currentNode.Right)) == 1)
-            {
-                ctx.State = PlayerState.Shimmy;
-                return;
-            }
-        }
+        Vector3 moveVec = (currentNode.GlobalRight * inputX + currentNode.transform.up * inputY).normalized;
 
         foreach (var edge in currentNode.OutgoingEdges)
         {
@@ -180,7 +170,7 @@ public class ParkourManager : MonoBehaviour
             float distance = rawDir.magnitude;
             rawDir.Normalize();
 
-            Vector3 dir = rawDir - globalNormal * Vector3.Dot(rawDir, globalNormal);
+            Vector3 dir = rawDir - currentNode.GlobalNormal * Vector3.Dot(rawDir, currentNode.GlobalNormal);
             Debug.DrawRay(fromPos, dir, Color.magenta);
             dir.Normalize();
 
@@ -201,6 +191,14 @@ public class ParkourManager : MonoBehaviour
 
         if (bestEdge == null)
         {
+            if (currentNode.Length != 0)
+            {
+                if (Mathf.Approximately(inputY, 0))
+                {
+                    ctx.State = PlayerState.Shimmy;
+                    return;
+                }
+            }
             return;
         }
 
@@ -227,16 +225,26 @@ public class ParkourManager : MonoBehaviour
         float inputX = Input.GetAxisRaw("Horizontal");
         Vector3 moveVec = (currentNode.transform.right * inputX + currentNode.transform.up * inputY).normalized;
 
-        if (moveVec.sqrMagnitude < 0.001f)
+        if (moveVec.sqrMagnitude < 0.001f || !Mathf.Approximately(inputY, 0))
         {
             ctx.State = PlayerState.Hanging;
             return;
         }
 
-        Vector3 move = Mathf.Sign(Vector3.Dot(moveVec, currentNode.Right)) * shimmySpeed * Time.deltaTime * currentNode.Right;
+        float project = currentNode.Project(transform.position);
+        Debug.Log($"{project} == {currentNode.Project(currentNode.End)} = {Mathf.Approximately(project, currentNode.Project(currentNode.End))}");
+        Debug.Log($"{Vector3.Dot(moveVec, currentNode.GlobalRight)}");
+        if (Mathf.Approximately(project, currentNode.Project(currentNode.End)) && Vector3.Dot(moveVec, currentNode.GlobalRight) > 0
+            || Mathf.Approximately(project, currentNode.Project(currentNode.Start)) && Vector3.Dot(moveVec, currentNode.GlobalRight) < 0)
+        {
+            ctx.State = PlayerState.Hanging;
+            return;
+        }
+
+        Vector3 move = Mathf.Sign(Vector3.Dot(moveVec, currentNode.GlobalRight)) * shimmySpeed * Time.deltaTime * currentNode.GlobalRight;
         Vector3 newPos = transform.position + move;
         float newPosProj = currentNode.Project(newPos);
-        newPos = currentNode.PointAt(newPosProj) + controller.radius * currentNode.transform.TransformDirection(currentNode.Normal) - controller.height * 0.75f * Vector3.up;
+        newPos = currentNode.PointAt(newPosProj) + controller.radius * currentNode.GlobalNormal - controller.height * 0.75f * Vector3.up;
 
         controller.enabled = false;
         transform.position = newPos;
@@ -252,7 +260,7 @@ public class ParkourManager : MonoBehaviour
         }
 
         currentNode = bestNode;
-        currentAnchorPoint = currentNode.PointAtProject(transform.position) + controller.radius * currentNode.transform.TransformDirection(currentNode.Normal) - controller.height * 0.75f * Vector3.up;
+        currentAnchorPoint = currentNode.PointAtProject(transform.position) + controller.radius * currentNode.GlobalNormal - controller.height * 0.75f * Vector3.up;
         ctx.State = PlayerState.Climbing;
     }
 
@@ -276,7 +284,7 @@ public class ParkourManager : MonoBehaviour
             return;
         }
 
-        Quaternion targetRot = Quaternion.LookRotation(-currentNode.transform.TransformDirection(currentNode.Normal));
+        Quaternion targetRot = Quaternion.LookRotation(-currentNode.GlobalNormal);
         Vector3 targetPos = currentAnchorPoint;
 
         if (transform.position == targetPos && transform.rotation == targetRot)
