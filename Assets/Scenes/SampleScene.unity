@@ -635,7 +635,7 @@ MonoBehaviour:
   boxSize: {x: 1.5, y: 2, z: 2}
   obstacleLayerMask:
     serializedVersion: 2
-    m_Bits: 65
+    m_Bits: 1
 --- !u!114 &72440912
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1279,7 +1279,7 @@ GameObject:
   m_Component:
   - component: {fileID: 258924451}
   - component: {fileID: 258924453}
-  - component: {fileID: 258924452}
+  - component: {fileID: 258924454}
   m_Layer: 0
   m_Name: GraphNode
   m_TagString: Untagged
@@ -1302,27 +1302,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1262746895}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &258924452
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 258924450}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.005
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &258924453
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1365,6 +1344,27 @@ MonoBehaviour:
       range: {x: 12.4, y: 12.7}
     to:
       range: {x: 0, y: 0.3}
+--- !u!65 &258924454
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 258924450}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.646, y: 1, z: 1.5550736}
+  m_Center: {x: 1.4368318e-16, y: 0, z: 0.27753684}
 --- !u!1 &304615815
 GameObject:
   m_ObjectHideFlags: 0
