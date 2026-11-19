@@ -250,7 +250,7 @@ public class ParkourManager : MonoBehaviour
                     return;
                 }
             }
-            else
+            else if (inputY > 0)
             {
                 if (CanClimbUp(out var posToTransfer))
                 {
