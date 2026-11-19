@@ -4775,7 +4775,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1680717000}
   - component: {fileID: 1680717002}
-  - component: {fileID: 1680717001}
+  - component: {fileID: 1680717003}
   m_Layer: 0
   m_Name: GraphNode
   m_TagString: Untagged
@@ -4798,27 +4798,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1249785592}
   m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
---- !u!135 &1680717001
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1680716999}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.005
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &1680717002
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4841,6 +4820,27 @@ MonoBehaviour:
       range: {x: 0, y: 0.3}
     to:
       range: {x: 12.4, y: 12.7}
+--- !u!65 &1680717003
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1680716999}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1720906590
 GameObject:
   m_ObjectHideFlags: 0
