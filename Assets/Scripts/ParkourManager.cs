@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(CharacterController), typeof(PlayerContext))]
@@ -8,6 +7,7 @@ public class ParkourManager : MonoBehaviour
     [SerializeField] private KeyCode jumpKey = KeyCode.Space;
     [SerializeField] private KeyCode dropKey = KeyCode.E;
     [SerializeField] private Vector3 boxSize = new(1.5f, 2.0f, 2.0f);
+    [SerializeField] private LayerMask obstacleLayerMask;
     private const float boxForwardDistance = 1.5f;
     private LayerMask nodeLayer;
     private const int maxNodesForScan = 15;
@@ -191,12 +191,19 @@ public class ParkourManager : MonoBehaviour
 
         if (bestEdge == null)
         {
-            if (currentNode.Length != 0)
+            if (Mathf.Approximately(inputY, 0))
             {
-                if (Mathf.Approximately(inputY, 0))
+                if (currentNode.Length != 0)
                 {
                     ctx.State = PlayerState.Shimmy;
                     return;
+                }
+            }
+            else
+            {
+                if (CanClimbUp(out var posToTransfer))
+                {
+                    ClimbUp(posToTransfer);
                 }
             }
             return;
@@ -212,6 +219,29 @@ public class ParkourManager : MonoBehaviour
         Debug.Log($"Found best edge for transfering: {nodeFullName}");
 
         TransferToNextLedge(bestEdge.TargetNode);
+    }
+
+    private bool CanClimbUp(out Vector3 posToTransfer)
+    {
+        posToTransfer = Vector3.zero;
+        Vector3 ledgePointForArms = currentNode.PointAtProject(transform.position);
+
+        Vector3 newPlayerPos = ledgePointForArms - currentNode.GlobalNormal * controller.radius;
+
+        if (Physics.CheckBox(ledgePointForArms + (controller.height / 2 + 0.05f) * Vector3.up, new(controller.radius, controller.height / 2, controller.radius), transform.rotation, obstacleLayerMask))
+        {
+            return false;
+        }
+
+        posToTransfer = newPlayerPos;
+        return true;
+    }
+
+    private void ClimbUp(Vector3 posToTransfer)
+    {
+        currentAnchorPoint = posToTransfer;
+        ctx.State = PlayerState.Climbing;
+        currentNode = null;
     }
 
     private void Shimmy()
@@ -279,17 +309,17 @@ public class ParkourManager : MonoBehaviour
 
     private void TransferIfClimbing()
     {
-        if (ctx.State != PlayerState.Climbing || currentNode == null)
+        if (ctx.State != PlayerState.Climbing)
         {
             return;
         }
 
-        Quaternion targetRot = Quaternion.LookRotation(-currentNode.GlobalNormal);
+        Quaternion targetRot = currentNode != null ? Quaternion.LookRotation(-currentNode.GlobalNormal) : transform.rotation;
         Vector3 targetPos = currentAnchorPoint;
 
         if (transform.position == targetPos && transform.rotation == targetRot)
         {
-            ctx.State = PlayerState.Hanging;
+            ctx.State = currentNode != null ? PlayerState.Hanging : PlayerState.Idle;
             return;
         }
 
