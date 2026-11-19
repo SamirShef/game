@@ -45,11 +45,62 @@ public class ParkourManager : MonoBehaviour
 
     private void Update()
     {
+        ScanDropDownShimmyLedge();
         ScanWallToLedges();
         ScanNextLedgeOnWall();
         Shimmy();
         DropFromHanging();
         TransferIfClimbing();
+    }
+
+    private void ScanDropDownShimmyLedge()
+    {
+        if (ctx.State != PlayerState.Idle && ctx.State != PlayerState.Locomotion)
+        {
+            return;
+        }
+
+        Vector3 halfExtent = new(controller.radius * 1.5f, 0.3f, controller.radius * 1.5f);
+        Vector3 boxStart = transform.position + Vector3.up * halfExtent.y;
+
+        foundNodesCount = Physics.OverlapBoxNonAlloc(boxStart, halfExtent, foundNodes, transform.rotation, nodeLayer);
+        ParkourNode bestNode = null;
+        float minimalDistance = float.MaxValue;
+
+        for (int i = 0; i < foundNodesCount; i++)
+        {
+            if (foundNodes[i].TryGetComponent<ParkourNode>(out var node))
+            {
+                Vector3 dirToNode = node.transform.position - node.PointAtProject(transform.position);
+                float distance = dirToNode.magnitude;
+                dirToNode.Normalize();
+
+                if (minimalDistance > distance)
+                {
+                    minimalDistance = distance;
+                    bestNode = node;
+                }
+            }
+        }
+
+        if (bestNode == null)
+        {
+            return;
+        }
+
+        string nodeFullName = bestNode.name;
+        Transform curParent = bestNode.transform.parent;
+        while (curParent != null)
+        {
+            nodeFullName = $"{curParent.name}/{nodeFullName}";
+            curParent = curParent.parent;
+        }
+        Debug.Log($"May be drop down ledge: {nodeFullName}");
+
+        if (Input.GetKeyDown(dropKey))
+        {
+            DropIntoHanging(bestNode);
+        }
     }
 
     private void ScanWallToLedges()
@@ -199,7 +250,7 @@ public class ParkourManager : MonoBehaviour
                     return;
                 }
             }
-            else
+            else if (inputY > 0)
             {
                 if (CanClimbUp(out var posToTransfer))
                 {
@@ -307,6 +358,11 @@ public class ParkourManager : MonoBehaviour
         }
     }
 
+    private void DropIntoHanging(ParkourNode targetNode)
+    {
+        TransferToNextLedge(targetNode);
+    }
+
     private void TransferIfClimbing()
     {
         if (ctx.State != PlayerState.Climbing)
@@ -350,10 +406,13 @@ public class ParkourManager : MonoBehaviour
         if (Application.isPlaying && (ctx.State == PlayerState.Idle || ctx.State == PlayerState.Locomotion))
         {
             Vector3 boxCenter = transform.position + 0.5f * boxForwardDistance * moveVec + boxSize.y * Vector3.up;
-
             Gizmos.color = new Color(0f, 1f, 0.5f, 0.3f);
-
             Gizmos.DrawWireCube(boxCenter, boxSize);
+
+            Vector3 halfExtent = new(controller.radius * 1.5f, 0.3f, controller.radius * 1.5f);
+            boxCenter = transform.position + Vector3.up * halfExtent.y;
+            Gizmos.color = Color.rebeccaPurple;
+            Gizmos.DrawWireCube(boxCenter, halfExtent * 2);
         }
 
         if (foundNodesCount != 0)
