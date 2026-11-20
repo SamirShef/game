@@ -55,7 +55,7 @@ public class ParkourManager : MonoBehaviour
 
     private void ScanDropDownShimmyLedge()
     {
-        if (ctx.State != PlayerState.Idle && ctx.State != PlayerState.Locomotion)
+        if (ctx.State != PlayerState.Idle && ctx.State != PlayerState.Locomotion && ctx.State != PlayerState.Balancing)
         {
             return;
         }
