@@ -69,7 +69,7 @@ public class ParkourManager : MonoBehaviour
 
         for (int i = 0; i < foundNodesCount; i++)
         {
-            if (foundNodes[i].TryGetComponent<ParkourNode>(out var node))
+            if (foundNodes[i].TryGetComponent<ParkourNode>(out var node) && node.NodeType == ParkourNodeType.Ledge)
             {
                 Vector3 dirToNode = node.transform.position - node.PointAtProject(transform.position);
                 float distance = dirToNode.magnitude;
@@ -304,7 +304,7 @@ public class ParkourManager : MonoBehaviour
 
         float inputY = Input.GetAxisRaw("Vertical");
         float inputX = Input.GetAxisRaw("Horizontal");
-        Vector3 moveVec = (currentNode.transform.right * inputX + currentNode.transform.up * inputY).normalized;
+        Vector3 moveVec = (currentNode.GlobalRight * inputX + currentNode.transform.up * inputY).normalized;
 
         if (moveVec.sqrMagnitude < 0.001f || !Mathf.Approximately(inputY, 0))
         {
@@ -313,10 +313,11 @@ public class ParkourManager : MonoBehaviour
         }
 
         float project = currentNode.Project(transform.position);
-        Debug.Log($"{project} == {currentNode.Project(currentNode.End)} = {Mathf.Approximately(project, currentNode.Project(currentNode.End))}");
+        Debug.Log($"{project} == {currentNode.Project(currentNode.Start)} = {Mathf.Abs(currentNode.Project(currentNode.Start) - project) <= 0.01f}");
+        Debug.Log($"{project} == {currentNode.Project(currentNode.End)} = {Mathf.Abs(currentNode.Project(currentNode.End) - project) <= 0.01f}");
         Debug.Log($"{Vector3.Dot(moveVec, currentNode.GlobalRight)}");
-        if (Mathf.Approximately(project, currentNode.Project(currentNode.End)) && Vector3.Dot(moveVec, currentNode.GlobalRight) > 0
-            || Mathf.Approximately(project, currentNode.Project(currentNode.Start)) && Vector3.Dot(moveVec, currentNode.GlobalRight) < 0)
+        if (Mathf.Abs(currentNode.Project(currentNode.End) - project) <= 0.01f && Vector3.Dot(moveVec, currentNode.GlobalRight) > 0
+            || Mathf.Abs(currentNode.Project(currentNode.Start) - project) <= 0.01f && Vector3.Dot(moveVec, currentNode.GlobalRight) < 0)
         {
             ctx.State = PlayerState.Hanging;
             return;
