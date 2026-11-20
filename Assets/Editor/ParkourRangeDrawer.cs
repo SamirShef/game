@@ -4,7 +4,7 @@ using UnityEngine;
 [CustomPropertyDrawer(typeof(ParkourRange))]
 public class ParkourRangeDrawer : PropertyDrawer
 {
-    private static readonly GUIContent[] Labels = { new("From"), new("To") };
+    private static readonly GUIContent[] Labels = { new("Start"), new("End") };
 
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
     {

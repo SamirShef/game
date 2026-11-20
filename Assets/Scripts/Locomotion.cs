@@ -16,6 +16,13 @@ public class Locomotion : MonoBehaviour
     [SerializeField] private int rayCount = 5;
     [SerializeField] private float probeArcAngle = 80.0f;
 
+    [Header("Beam Balancing")]
+    [SerializeField] private float beamDetectRadius = 0.6f;
+    [SerializeField] private float beamDetectHalfHeight = 1.0f;
+    [SerializeField] private float beamEntryMaxAngle = 45f;
+    [SerializeField] private float beamExitOppositeMaxAngle = 40f;
+    [SerializeField] private float beamEdgeEpsilon = 0.05f;
+
     [SerializeField] private float gravityValue = 9.81f;
 
     private Animator animator;
@@ -28,11 +35,17 @@ public class Locomotion : MonoBehaviour
 
     private float airborneTimer = 0f;
 
+    private LayerMask nodeLayer;
+    private readonly Collider[] beamCollidersBuffer = new Collider[8];
+    private ParkourNode currentBeamNode;
+
     private void Awake()
     {
         animator = GetComponentInChildren<Animator>();
         controller = GetComponent<CharacterController>();
         ctx = GetComponent<PlayerContext>();
+        nodeLayer = LayerMask.GetMask(ParkourNode.LayerName);
+
         if (Camera.main != null)
         {
             cameraTransform = Camera.main.transform;
@@ -46,6 +59,7 @@ public class Locomotion : MonoBehaviour
             ctx.State != PlayerState.Jumping &&
             ctx.State != PlayerState.Balancing)
         {
+            currentBeamNode = null;
             playerVelocity = Vector3.zero;
             return;
         }
@@ -84,18 +98,20 @@ public class Locomotion : MonoBehaviour
             return;
         }
 
-        float moveX = Input.GetAxisRaw("Horizontal");
-        float moveZ = Input.GetAxisRaw("Vertical");
-        Vector3 inputVec = new Vector3(moveX, 0, moveZ).normalized;
+        Vector3 moveVec = GetCameraRelativeMoveInput();
 
-        Vector3 cameraForward = cameraTransform.forward;
-        Vector3 cameraRight = cameraTransform.right;
-        cameraForward.y = 0;
-        cameraRight.y = 0;
-        cameraForward.Normalize();
-        cameraRight.Normalize();
+        if (ctx.State == PlayerState.Balancing)
+        {
+            HandleBalancingMovement(moveVec);
+            return;
+        }
 
-        Vector3 moveVec = (cameraForward * inputVec.z + cameraRight * inputVec.x).normalized;
+        TryEnterBeamBalancing(moveVec);
+        if (ctx.State == PlayerState.Balancing)
+        {
+            HandleBalancingMovement(moveVec);
+            return;
+        }
 
         bool needJumping = Input.GetKey(highProfileCode) && Input.GetKeyDown(jumpCode);
         if (controller.isGrounded && !needJumping && moveVec.sqrMagnitude > 0.001f)
@@ -151,6 +167,208 @@ public class Locomotion : MonoBehaviour
     {
         // animator?.CrossFade("Jumping", 0.15f);
         ApplyJumpForce();
+    }
+
+    private Vector3 GetCameraRelativeMoveInput()
+    {
+        float moveX = Input.GetAxisRaw("Horizontal");
+        float moveZ = Input.GetAxisRaw("Vertical");
+        Vector3 inputVec = new(moveX, 0f, moveZ);
+
+        if (inputVec.sqrMagnitude < 0.001f || cameraTransform == null)
+        {
+            return Vector3.zero;
+        }
+
+        inputVec.Normalize();
+
+        Vector3 cameraForward = cameraTransform.forward;
+        Vector3 cameraRight = cameraTransform.right;
+        cameraForward.y = 0f;
+        cameraRight.y = 0f;
+        cameraForward.Normalize();
+        cameraRight.Normalize();
+
+        Vector3 moveVec = cameraForward * inputVec.z + cameraRight * inputVec.x;
+        return moveVec.sqrMagnitude > 0.001f ? moveVec.normalized : Vector3.zero;
+    }
+
+    private void TryEnterBeamBalancing(Vector3 moveVec)
+    {
+        if (moveVec.sqrMagnitude < 0.001f)
+        {
+            return;
+        }
+
+        Vector3 boxCenter = transform.position + Vector3.up * beamDetectHalfHeight;
+        Vector3 halfExtents = new(beamDetectRadius, beamDetectHalfHeight, beamDetectRadius);
+        int count = Physics.OverlapBoxNonAlloc(
+            boxCenter,
+            halfExtents,
+            beamCollidersBuffer,
+            transform.rotation,
+            nodeLayer
+        );
+
+        ParkourNode bestBeam = null;
+        Vector3 bestProjPoint = Vector3.zero;
+        float bestDistanceSqr = float.MaxValue;
+
+        Vector3 flatMove = new Vector3(moveVec.x, 0f, moveVec.z).normalized;
+
+        for (int i = 0; i < count; i++)
+        {
+            Collider col = beamCollidersBuffer[i];
+            if (col == null || col is not BoxCollider)
+            {
+                continue;
+            }
+
+            if (!col.TryGetComponent<ParkourNode>(out var node) || node.NodeType != ParkourNodeType.Beam)
+            {
+                continue;
+            }
+
+            Vector3 projPoint = node.PointAtProject(transform.position);
+            Vector3 toProjFlat = projPoint - transform.position;
+            toProjFlat.y = 0f;
+
+            bool angleValid;
+            if (toProjFlat.sqrMagnitude <= 0.0001f)
+            {
+                angleValid = true;
+            }
+            else
+            {
+                float angleToProj = Vector3.Angle(flatMove, toProjFlat.normalized);
+                angleValid = angleToProj <= beamEntryMaxAngle;
+            }
+
+            if (!angleValid)
+            {
+                continue;
+            }
+
+            float distSqr = (projPoint - transform.position).sqrMagnitude;
+            if (distSqr < bestDistanceSqr)
+            {
+                bestDistanceSqr = distSqr;
+                bestBeam = node;
+                bestProjPoint = projPoint;
+            }
+        }
+
+        if (bestBeam == null)
+        {
+            return;
+        }
+
+        Vector3 targetMagnetPos = new(bestProjPoint.x, transform.position.y, bestProjPoint.z);
+        controller.enabled = false;
+        transform.position = targetMagnetPos;
+        controller.enabled = true;
+
+        currentBeamNode = bestBeam;
+        ctx.State = PlayerState.Balancing;
+    }
+
+    private void HandleBalancingMovement(Vector3 moveVec)
+    {
+        if (currentBeamNode == null)
+        {
+            ctx.State = moveVec.sqrMagnitude > 0.001f ? PlayerState.Locomotion : PlayerState.Idle;
+            return;
+        }
+
+        Vector3 beamAxis = currentBeamNode.GlobalRight;
+        beamAxis.y = 0f;
+        if (beamAxis.sqrMagnitude < 0.0001f)
+        {
+            beamAxis = currentBeamNode.GlobalRight.normalized;
+        }
+        else
+        {
+            beamAxis.Normalize();
+        }
+
+        float currentS = currentBeamNode.Project(transform.position);
+        float maxSpeed = Input.GetKey(highProfileCode) ? runSpeed : walkSpeed;
+
+        float alongDot = moveVec.sqrMagnitude > 0.001f ? Vector3.Dot(moveVec, beamAxis) : 0f;
+        float alongSpeed = Mathf.Abs(alongDot) > 0.01f ? Mathf.Sign(alongDot) * maxSpeed : 0f;
+
+        Vector3 oppositeMoveDir = Mathf.Abs(alongSpeed) > 0.001f
+            ? beamAxis * Mathf.Sign(alongSpeed)
+            : (Vector3.Dot(transform.forward, beamAxis) >= 0f ? beamAxis : -beamAxis);
+
+        Debug.DrawRay(currentBeamNode.transform.position + Vector3.up * 0.5f, beamAxis, Color.black);
+
+        bool atStart = currentS <= beamEdgeEpsilon;
+        bool atEnd = currentS >= currentBeamNode.Length - beamEdgeEpsilon;
+
+        if ((atStart || atEnd) && moveVec.sqrMagnitude > 0.001f)
+        {
+            Vector3 flatMove = new Vector3(moveVec.x, 0f, moveVec.z).normalized;
+            Vector3 flatOpposite = new Vector3(oppositeMoveDir.x, 0f, oppositeMoveDir.z).normalized;
+            float angleToOpposite = Vector3.Angle(flatMove, flatOpposite);
+            Debug.DrawRay(transform.position, flatMove * 5, Color.blue);
+            Debug.DrawRay(transform.position, flatOpposite * 5, Color.red);
+            Debug.Log($"angle = {angleToOpposite}");
+
+            if (angleToOpposite <= beamExitOppositeMaxAngle)
+            {
+                ExitBeamBalancing(moveVec);
+                return;
+            }
+        }
+
+        float nextS = Mathf.Clamp(currentS + alongSpeed * Time.deltaTime, 0f, currentBeamNode.Length);
+        Vector3 targetLinePoint = currentBeamNode.PointAt(nextS);
+
+        Vector3 desiredPos = new(targetLinePoint.x, transform.position.y, targetLinePoint.z);
+        Vector3 horizontalDisplacement = desiredPos - transform.position;
+        horizontalDisplacement.y = 0f;
+
+        if (Mathf.Abs(alongSpeed) > 0.001f)
+        {
+            Vector3 faceDir = alongSpeed > 0f ? beamAxis : -beamAxis;
+            float targetAngle = Mathf.Atan2(faceDir.x, faceDir.z) * Mathf.Rad2Deg;
+            float angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSmoothVel, turnSmoothTime);
+            transform.rotation = Quaternion.Euler(0f, angle, 0f);
+        }
+
+        playerVelocity.x = Time.deltaTime > 0f ? horizontalDisplacement.x / Time.deltaTime : 0f;
+        playerVelocity.z = Time.deltaTime > 0f ? horizontalDisplacement.z / Time.deltaTime : 0f;
+
+        animator?.SetFloat("Speed", Mathf.Abs(alongSpeed), 0.1f, Time.deltaTime);
+    }
+
+    private void ExitBeamBalancing(Vector3 moveVec)
+    {
+        Debug.Log("Exit from beam balancing");
+        currentBeamNode = null;
+        float speed = moveVec.sqrMagnitude > 0.001f
+            ? (Input.GetKey(highProfileCode) ? runSpeed : walkSpeed)
+            : 0f;
+
+        if (moveVec.sqrMagnitude > 0.001f)
+        {
+            playerVelocity.x = moveVec.x * speed;
+            playerVelocity.z = moveVec.z * speed;
+            ctx.State = PlayerState.Locomotion;
+
+            controller.enabled = false;
+            transform.position += playerVelocity * 0.05f;
+            controller.enabled = true;
+        }
+        else
+        {
+            playerVelocity.x = 0f;
+            playerVelocity.z = 0f;
+            ctx.State = PlayerState.Idle;
+        }
+
+        animator?.SetFloat("Speed", speed, 0.1f, Time.deltaTime);
     }
 
     private bool TryGetFloorEdgeDropNormal(Vector3 moveVec, out Vector3 edgeNormal)
