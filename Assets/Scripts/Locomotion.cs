@@ -27,6 +27,7 @@ public class Locomotion : MonoBehaviour
     [Header("Scanner")]
     [SerializeField] private Vector3 obstacleBoxHalfExtents = new(0.6f, 0.6f, 2.2f);
     [SerializeField] private float maxJumpOnObstacleHeight = 1f;
+    [SerializeField] private float maxJumpOnObstacleHeightWithoutJumpKey = 0.4f;
     [SerializeField] private float maxJumpDistance = 2.2f;
     [SerializeField] private float autoJumpTriggerDistance = 1.1f;
     [SerializeField] private float obstacleJumpMoveSpeed = 7f;
@@ -204,7 +205,6 @@ public class Locomotion : MonoBehaviour
             Vector3 rawPoint = c.ClosestPoint(transform.position);
             rawPoint += moveVec * 0.2f;
             rawPoint.y = c.bounds.max.y + 5f;
-            Debug.DrawRay(rawPoint, Vector3.up * 2, Color.blue);
 
             Vector3 targetPoint = c.ClosestPoint(rawPoint);
             float dY = targetPoint.y - transform.position.y;
@@ -214,8 +214,13 @@ public class Locomotion : MonoBehaviour
             }
             float heightScore = 1f - Mathf.Clamp01(dY / Mathf.Max(0.01f, maxJumpOnObstacleHeight));
 
-            float dot = Vector3.Dot(new Vector3(targetPoint.x, 0, targetPoint.z).normalized, moveVec);
-            if (dot <= 0.6f)
+            Vector3 toTargetFlat = new(
+                targetPoint.x - transform.position.x,
+                0f,
+                targetPoint.z - transform.position.z
+            );
+            float dot = Vector3.Dot(toTargetFlat.normalized, moveVec);
+            if (dot <= 0.2f)
             {
                 continue;
             }
@@ -226,7 +231,7 @@ public class Locomotion : MonoBehaviour
 
             float score = inputScore + distanceScore + heightScore;
 
-            Debug.DrawRay(targetPoint, Vector3.up * 2, Color.rebeccaPurple, 5);
+            Debug.DrawRay(targetPoint, Vector3.up, Color.rebeccaPurple, 5);
             ObstacleCandidate candidate = new(c, targetPoint, dY, distance, score);
             if (score > bestScore)
             {
@@ -245,7 +250,7 @@ public class Locomotion : MonoBehaviour
         bestObstacleCandidate = bestCandidate;
         Debug.DrawRay(bestCandidate.TargetPoint, Vector3.up * 2.5f, Color.gold);
 
-        if (Input.GetKey(highProfileCode) && bestCandidate.Distance <= autoJumpTriggerDistance)
+        if (Input.GetKey(highProfileCode) && bestCandidate.Distance <= autoJumpTriggerDistance && bestCandidate.DeltaY <= maxJumpOnObstacleHeightWithoutJumpKey)
         {
             StartObstacleJump(bestCandidate.TargetPoint);
         }
