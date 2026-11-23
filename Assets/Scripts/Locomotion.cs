@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(CharacterController), typeof(PlayerContext))]
@@ -23,6 +24,21 @@ public class Locomotion : MonoBehaviour
     [SerializeField] private float beamExitOppositeMaxAngle = 40f;
     [SerializeField] private float beamEdgeEpsilon = 0.05f;
 
+    [Header("Scanner")]
+    [SerializeField] private Vector3 obstacleBoxHalfExtents = new(0.6f, 0.6f, 2.2f);
+    [SerializeField] private float maxJumpOnObstacleHeight = 1f;
+    [SerializeField] private float maxJumpOnObstacleHeightWithoutJumpKey = 0.4f;
+    [SerializeField] private float maxJumpDistance = 2.2f;
+    [SerializeField] private float autoJumpTriggerDistance = 1.1f;
+    [SerializeField] private float obstacleJumpMoveSpeed = 7f;
+    [SerializeField] private LayerMask obstacleLayer;
+    private const int maxObstaclesCount = 10;
+    private readonly Collider[] obstacles = new Collider[maxObstaclesCount];
+    private bool hasBestObstacleCandidate;
+    private ObstacleCandidate bestObstacleCandidate;
+    private bool isJumpingToObstacleTarget;
+    private Vector3 obstacleJumpTarget;
+
     [SerializeField] private float gravityValue = 9.81f;
 
     private Animator animator;
@@ -38,6 +54,24 @@ public class Locomotion : MonoBehaviour
     private LayerMask nodeLayer;
     private readonly Collider[] beamCollidersBuffer = new Collider[8];
     private ParkourNode currentBeamNode;
+
+    private readonly struct ObstacleCandidate
+    {
+        public readonly Collider Collider;
+        public readonly Vector3 TargetPoint;
+        public readonly float DeltaY;
+        public readonly float Distance;
+        public readonly float Score;
+
+        public ObstacleCandidate(Collider c, Vector3 targetPoint, float dY, float dist, float score)
+        {
+            Collider = c;
+            TargetPoint = targetPoint;
+            DeltaY = dY;
+            Distance = dist;
+            Score = score;
+        }
+    }
 
     private void Awake()
     {
@@ -76,19 +110,9 @@ public class Locomotion : MonoBehaviour
         }
 
         HandleMovement();
+        ScanObstacles();
         HandleJumping();
         HandlePhysics();
-    }
-
-    private void HandlePhysics()
-    {
-        if (airborneTimer <= 0f && controller.isGrounded && playerVelocity.y < 0f)
-        {
-            playerVelocity.y = -2f;
-        }
-
-        playerVelocity.y -= gravityValue * Time.deltaTime;
-        controller?.Move(playerVelocity * Time.deltaTime);
     }
 
     private void HandleMovement()
@@ -154,13 +178,151 @@ public class Locomotion : MonoBehaviour
         animator?.SetFloat("Speed", speed, 0.1f, Time.deltaTime);
     }
 
+    private void ScanObstacles()
+    {
+        if (ctx.State != PlayerState.Locomotion)
+        {
+            return;
+        }
+
+        Vector3 moveVec = GetCameraRelativeMoveInput();
+        Vector3 boxCenter = transform.position + moveVec * obstacleBoxHalfExtents.z + Vector3.up * obstacleBoxHalfExtents.y;
+
+        int count = Physics.OverlapBoxNonAlloc(boxCenter, obstacleBoxHalfExtents, obstacles, Quaternion.LookRotation(moveVec), obstacleLayer);
+        if (count == 0)
+        {
+            return;
+        }
+
+        ObstacleCandidate bestCandidate = default;
+        float bestScore = -float.MaxValue;
+        bool found = false;
+
+        for (int i = 0; i < count; ++i)
+        {
+            Collider c = obstacles[i];
+
+            Vector3 rawPoint = c.ClosestPoint(transform.position);
+            rawPoint += moveVec * 0.2f;
+            rawPoint.y = c.bounds.max.y + 5f;
+
+            Vector3 targetPoint = c.ClosestPoint(rawPoint);
+            float dY = targetPoint.y - transform.position.y;
+            if (dY <= maxStepHeight || dY > maxJumpOnObstacleHeight)
+            {
+                continue;
+            }
+            float heightScore = 1f - Mathf.Clamp01(dY / Mathf.Max(0.01f, maxJumpOnObstacleHeight));
+
+            Vector3 toTargetFlat = new(
+                targetPoint.x - transform.position.x,
+                0f,
+                targetPoint.z - transform.position.z
+            );
+            float dot = Vector3.Dot(toTargetFlat.normalized, moveVec);
+            if (dot <= 0.2f)
+            {
+                continue;
+            }
+            float inputScore = Mathf.InverseLerp(0.2f, 1f, dot);
+
+            float distance = Vector3.Distance(targetPoint, transform.position);
+            float distanceScore = 1f - Mathf.Clamp01(distance / Mathf.Max(0.01f, maxJumpDistance));
+
+            float score = inputScore + distanceScore + heightScore;
+
+            Debug.DrawRay(targetPoint, Vector3.up, Color.rebeccaPurple, 5);
+            ObstacleCandidate candidate = new(c, targetPoint, dY, distance, score);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCandidate = candidate;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            return;
+        }
+
+        hasBestObstacleCandidate = true;
+        bestObstacleCandidate = bestCandidate;
+        Debug.DrawRay(bestCandidate.TargetPoint, Vector3.up * 2.5f, Color.gold);
+
+        if (Input.GetKey(highProfileCode) && bestCandidate.Distance <= autoJumpTriggerDistance && bestCandidate.DeltaY <= maxJumpOnObstacleHeightWithoutJumpKey)
+        {
+            StartObstacleJump(bestCandidate.TargetPoint);
+        }
+    }
+
+    private void StartObstacleJump(Vector3 targetPoint)
+    {
+        hasBestObstacleCandidate = false;
+        isJumpingToObstacleTarget = true;
+        obstacleJumpTarget = targetPoint;
+        airborneTimer = 0.15f;
+        playerVelocity = Vector3.zero;
+        ctx.State = PlayerState.Jumping;
+
+        Vector3 lookDir = obstacleJumpTarget - transform.position;
+        lookDir.y = 0f;
+        if (lookDir.sqrMagnitude > 0.0001f)
+        {
+            transform.rotation = Quaternion.LookRotation(lookDir.normalized);
+        }
+    }
+
     private void HandleJumping()
     {
+        if (isJumpingToObstacleTarget || !controller.isGrounded || ctx.State == PlayerState.Jumping)
+        {
+            return;
+        }
+
         if (Input.GetKey(highProfileCode) && Input.GetKeyDown(jumpCode) && controller.isGrounded)
         {
-            ChangeStateToJumping();
-            HandleJump();
+            if (hasBestObstacleCandidate)
+            {
+                StartObstacleJump(bestObstacleCandidate.TargetPoint);
+            }
+            else
+            {
+                ChangeStateToJumping();
+                HandleJump();
+            }
         }
+    }
+
+    private void HandlePhysics()
+    {
+        if (isJumpingToObstacleTarget)
+        {
+            Vector3 nextPos = Vector3.MoveTowards(
+                transform.position,
+                obstacleJumpTarget,
+                obstacleJumpMoveSpeed * Time.deltaTime
+            );
+            Vector3 displacement = nextPos - transform.position;
+            playerVelocity = displacement / Time.deltaTime;
+            controller.Move(displacement);
+
+            if (transform.position == obstacleJumpTarget || airborneTimer <= 0f && controller.isGrounded)
+            {
+                isJumpingToObstacleTarget = false;
+                playerVelocity = Vector3.zero;
+                ctx.State = PlayerState.Locomotion;
+            }
+            return;
+        }
+
+        if (airborneTimer <= 0f && controller.isGrounded && playerVelocity.y < 0f)
+        {
+            playerVelocity.y = -2f;
+        }
+
+        playerVelocity.y -= gravityValue * Time.deltaTime;
+        controller?.Move(playerVelocity * Time.deltaTime);
     }
 
     private void HandleJump()

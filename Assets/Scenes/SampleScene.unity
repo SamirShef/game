@@ -591,6 +591,19 @@ MonoBehaviour:
   fallThreshold: 0.8
   rayCount: 5
   probeArcAngle: 80
+  beamDetectRadius: 0.6
+  beamDetectHalfHeight: 1
+  beamEntryMaxAngle: 45
+  beamExitOppositeMaxAngle: 40
+  beamEdgeEpsilon: 0.05
+  obstacleBoxHalfExtents: {x: 0.6, y: 0.6, z: 2.2}
+  maxJumpOnObstacleHeight: 1
+  maxJumpDistance: 2.2
+  autoJumpTriggerDistance: 1.1
+  obstacleJumpMoveSpeed: 7
+  obstacleLayer:
+    serializedVersion: 2
+    m_Bits: 65
   gravityValue: 9.81
 --- !u!143 &72440910
 CharacterController:
