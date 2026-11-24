@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(CharacterController), typeof(PlayerContext))]
@@ -25,11 +24,13 @@ public class Locomotion : MonoBehaviour
     [SerializeField] private float beamEdgeEpsilon = 0.05f;
 
     [Header("Scanner")]
-    [SerializeField] private Vector3 obstacleBoxHalfExtents = new(0.6f, 0.6f, 2.2f);
+    [SerializeField] private Vector3 obstacleBoxHalfExtents = new(0.6f, 1f, 2.2f);
     [SerializeField] private float maxJumpOnObstacleHeight = 1f;
+    [SerializeField] private float minJumpDownHeight = -1.2f;
     [SerializeField] private float maxJumpOnObstacleHeightWithoutJumpKey = 0.4f;
     [SerializeField] private float maxJumpDistance = 2.2f;
     [SerializeField] private float autoJumpTriggerDistance = 1.1f;
+    [SerializeField] private float autoJumpTriggerDistanceWhenBlockedMoving = 3f;
     [SerializeField] private float obstacleJumpMoveSpeed = 7f;
     [SerializeField] private LayerMask obstacleLayer;
     private const int maxObstaclesCount = 10;
@@ -38,6 +39,7 @@ public class Locomotion : MonoBehaviour
     private ObstacleCandidate bestObstacleCandidate;
     private bool isJumpingToObstacleTarget;
     private Vector3 obstacleJumpTarget;
+    private bool blockedMoving = false;
 
     [SerializeField] private float gravityValue = 9.81f;
 
@@ -146,9 +148,23 @@ public class Locomotion : MonoBehaviour
                 float dot = Vector3.Dot(moveVec, edgeNormal);
                 if (dot > 0)
                 {
+                    blockedMoving = true;
+                    ScanObstacles();
+                    if (isJumpingToObstacleTarget)
+                    {
+                        return;
+                    }
                     moveVec -= edgeNormal * dot;
                     moveVec.Normalize();
                 }
+                else
+                {
+                    blockedMoving = false;
+                }
+            }
+            else
+            {
+                blockedMoving = false;
             }
         }
 
@@ -180,23 +196,36 @@ public class Locomotion : MonoBehaviour
 
     private void ScanObstacles()
     {
-        if (ctx.State != PlayerState.Locomotion)
+        if (ctx.State != PlayerState.Idle && ctx.State != PlayerState.Locomotion)
         {
+            hasBestObstacleCandidate = false;
+            bestObstacleCandidate = default;
             return;
         }
 
         Vector3 moveVec = GetCameraRelativeMoveInput();
-        Vector3 boxCenter = transform.position + moveVec * obstacleBoxHalfExtents.z + Vector3.up * obstacleBoxHalfExtents.y;
+        if (moveVec.sqrMagnitude <= 0.001f)
+        {
+            hasBestObstacleCandidate = false;
+            bestObstacleCandidate = default;
+            return;
+        }
 
-        int count = Physics.OverlapBoxNonAlloc(boxCenter, obstacleBoxHalfExtents, obstacles, Quaternion.LookRotation(moveVec), obstacleLayer);
+        Debug.Log("ScanObstacles");
+        Vector3 boxCenter = transform.position + moveVec * obstacleBoxHalfExtents.z + obstacleBoxHalfExtents.y / 2 * Vector3.up;
+
+        int count = Physics.OverlapBoxNonAlloc(boxCenter, obstacleBoxHalfExtents, obstacles, Quaternion.LookRotation(moveVec), obstacleLayer, QueryTriggerInteraction.Ignore);
         if (count == 0)
         {
+            hasBestObstacleCandidate = false;
+            bestObstacleCandidate = default;
             return;
         }
 
         ObstacleCandidate bestCandidate = default;
         float bestScore = -float.MaxValue;
         bool found = false;
+        float autoJumpDistance = blockedMoving ? autoJumpTriggerDistanceWhenBlockedMoving : autoJumpTriggerDistance;
 
         for (int i = 0; i < count; ++i)
         {
@@ -208,7 +237,8 @@ public class Locomotion : MonoBehaviour
 
             Vector3 targetPoint = c.ClosestPoint(rawPoint);
             float dY = targetPoint.y - transform.position.y;
-            if (dY <= maxStepHeight || dY > maxJumpOnObstacleHeight)
+            if (dY > 0 && (dY <= maxStepHeight || dY > maxJumpOnObstacleHeight)
+                || dY <= 0 && dY < minJumpDownHeight)
             {
                 continue;
             }
@@ -227,6 +257,10 @@ public class Locomotion : MonoBehaviour
             float inputScore = Mathf.InverseLerp(0.2f, 1f, dot);
 
             float distance = Vector3.Distance(targetPoint, transform.position);
+            if (distance <= 0.5f)
+            {
+                continue;
+            }
             float distanceScore = 1f - Mathf.Clamp01(distance / Mathf.Max(0.01f, maxJumpDistance));
 
             float score = inputScore + distanceScore + heightScore;
@@ -243,14 +277,18 @@ public class Locomotion : MonoBehaviour
 
         if (!found)
         {
+            Debug.Log("not found");
+            hasBestObstacleCandidate = false;
+            bestObstacleCandidate = default;
             return;
         }
+        Debug.Log("found");
 
         hasBestObstacleCandidate = true;
         bestObstacleCandidate = bestCandidate;
         Debug.DrawRay(bestCandidate.TargetPoint, Vector3.up * 2.5f, Color.gold);
 
-        if (Input.GetKey(highProfileCode) && bestCandidate.Distance <= autoJumpTriggerDistance && bestCandidate.DeltaY <= maxJumpOnObstacleHeightWithoutJumpKey)
+        if (Input.GetKey(highProfileCode) && bestCandidate.Distance <= autoJumpDistance && bestCandidate.DeltaY <= maxJumpOnObstacleHeightWithoutJumpKey)
         {
             StartObstacleJump(bestCandidate.TargetPoint);
         }
@@ -258,8 +296,10 @@ public class Locomotion : MonoBehaviour
 
     private void StartObstacleJump(Vector3 targetPoint)
     {
+        Debug.Log("start jumping");
         hasBestObstacleCandidate = false;
         isJumpingToObstacleTarget = true;
+        blockedMoving = false;
         obstacleJumpTarget = targetPoint;
         airborneTimer = 0.15f;
         playerVelocity = Vector3.zero;
@@ -309,6 +349,7 @@ public class Locomotion : MonoBehaviour
 
             if (transform.position == obstacleJumpTarget || airborneTimer <= 0f && controller.isGrounded)
             {
+                hasBestObstacleCandidate = false;
                 isJumpingToObstacleTarget = false;
                 playerVelocity = Vector3.zero;
                 ctx.State = PlayerState.Locomotion;
