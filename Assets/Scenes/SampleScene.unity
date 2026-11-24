@@ -596,9 +596,9 @@ MonoBehaviour:
   beamEntryMaxAngle: 45
   beamExitOppositeMaxAngle: 40
   beamEdgeEpsilon: 0.05
-  obstacleBoxHalfExtents: {x: 0.6, y: 1, z: 2.2}
+  obstacleBoxHalfExtents: {x: 0.6, y: 3, z: 2.2}
   maxJumpOnObstacleHeight: 1
-  minJumpDownHeight: -1.2
+  minJumpDownHeight: -2.2
   maxJumpOnObstacleHeightWithoutJumpKey: 0.4
   maxJumpDistance: 2.2
   autoJumpTriggerDistance: 1.1
@@ -5721,8 +5721,8 @@ Transform:
   m_GameObject: {fileID: 1968520378}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.86, y: 0.5, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: -2.86, y: 0.754, z: 0}
+  m_LocalScale: {x: 1, y: 1.508, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
