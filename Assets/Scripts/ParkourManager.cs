@@ -8,6 +8,7 @@ public class ParkourManager : MonoBehaviour
     [SerializeField] private KeyCode dropKey = KeyCode.E;
     [SerializeField] private Vector3 boxSize = new(1.5f, 2.0f, 2.0f);
     [SerializeField] private LayerMask obstacleLayerMask;
+    [SerializeField] private Vector3 hangingOffset = new(0f, -1.8f, 0f);
     private const float boxForwardDistance = 1.5f;
     private LayerMask nodeLayer;
     private const int maxNodesForScan = 15;
@@ -326,7 +327,7 @@ public class ParkourManager : MonoBehaviour
         Vector3 move = Mathf.Sign(Vector3.Dot(moveVec, currentNode.GlobalRight)) * shimmySpeed * Time.deltaTime * currentNode.GlobalRight;
         Vector3 newPos = transform.position + move;
         float newPosProj = currentNode.Project(newPos);
-        newPos = currentNode.PointAt(newPosProj) + controller.radius * currentNode.GlobalNormal - controller.height * 0.75f * Vector3.up;
+        newPos = currentNode.PointAt(newPosProj) + hangingOffset;
 
         controller.enabled = false;
         transform.position = newPos;
@@ -342,7 +343,7 @@ public class ParkourManager : MonoBehaviour
         }
 
         currentNode = bestNode;
-        currentAnchorPoint = currentNode.PointAtProject(transform.position) + controller.radius * currentNode.GlobalNormal - controller.height * 0.75f * Vector3.up;
+        currentAnchorPoint = currentNode.PointAtProject(transform.position) + hangingOffset;
         ctx.State = PlayerState.Climbing;
     }
 

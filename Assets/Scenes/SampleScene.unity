@@ -652,6 +652,7 @@ MonoBehaviour:
   obstacleLayerMask:
     serializedVersion: 2
     m_Bits: 1
+  hangingOffset: {x: 0, y: -1.8, z: 0}
 --- !u!114 &72440912
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4195,33 +4196,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 87fbf01b2211f5448888375694d1599c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1345902345}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 87fbf01b2211f5448888375694d1599c, type: 3}
 --- !u!4 &1325740424 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 87fbf01b2211f5448888375694d1599c, type: 3}
   m_PrefabInstance: {fileID: 1325740423}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1345902343 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 87fbf01b2211f5448888375694d1599c, type: 3}
-  m_PrefabInstance: {fileID: 1325740423}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &1345902345
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1345902343}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 05b4a7a3a33f73441923d4265cc8e169, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AnimationBridge
 --- !u!1 &1346588492
 GameObject:
   m_ObjectHideFlags: 0
