@@ -4,6 +4,7 @@ using UnityEngine;
 public class Locomotion : MonoBehaviour
 {
     [Header("Moving")]
+    [SerializeField] private float gravityValue = 9.81f;
     [SerializeField] private float walkSpeed = 1.5f;
     [SerializeField] private float runSpeed = 5f;
     [SerializeField] private float turnSmoothTime = 0.12f;
@@ -41,9 +42,10 @@ public class Locomotion : MonoBehaviour
     private Vector3 obstacleJumpTarget;
     private bool blockedMoving = false;
 
-    [SerializeField] private float gravityValue = 9.81f;
+    private static readonly int LocomotionHash = Animator.StringToHash("Locomotion");
 
     private Animator animator;
+    private ParkourAnimatorIKBridge ikBridge;
     private CharacterController controller;
     private PlayerContext ctx;
 
@@ -78,6 +80,7 @@ public class Locomotion : MonoBehaviour
     private void Awake()
     {
         animator = GetComponentInChildren<Animator>();
+        ikBridge = GetComponentInChildren<ParkourAnimatorIKBridge>();
         controller = GetComponent<CharacterController>();
         ctx = GetComponent<PlayerContext>();
         nodeLayer = LayerMask.GetMask(ParkourNode.LayerName);
@@ -122,6 +125,13 @@ public class Locomotion : MonoBehaviour
         if (!controller.isGrounded || ctx.State == PlayerState.Jumping)
         {
             return;
+        }
+
+        if (animator != null && !IsLocomotionActiveOrTransitioning(animator, 0))
+        {
+            animator.CrossFade(LocomotionHash, 0.15f);
+            animator.SetFloat("Speed", 0f);
+            ikBridge.ResetAll();
         }
 
         Vector3 moveVec = GetCameraRelativeMoveInput();
@@ -370,6 +380,26 @@ public class Locomotion : MonoBehaviour
     {
         // animator?.CrossFade("Jumping", 0.15f);
         ApplyJumpForce();
+    }
+
+    private bool IsLocomotionActiveOrTransitioning(Animator animator, int layerIndex = 0)
+    {
+        AnimatorStateInfo current = animator.GetCurrentAnimatorStateInfo(layerIndex);
+        if (current.shortNameHash == LocomotionHash)
+        {
+            return true;
+        }
+
+        if (animator.IsInTransition(layerIndex))
+        {
+            AnimatorStateInfo next = animator.GetNextAnimatorStateInfo(layerIndex);
+            if (next.shortNameHash == LocomotionHash)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private Vector3 GetCameraRelativeMoveInput()

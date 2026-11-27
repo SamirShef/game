@@ -9,6 +9,8 @@ public class ParkourManager : MonoBehaviour
     [SerializeField] private Vector3 boxSize = new(1.5f, 2.0f, 2.0f);
     [SerializeField] private LayerMask obstacleLayerMask;
     [SerializeField] private Vector3 hangingOffset = new(0f, -1.8f, 0f);
+    [SerializeField] private float handLength = 0.1f;
+    [SerializeField] private float shoulderLength = 0.5f;
     private const float boxForwardDistance = 1.5f;
     private LayerMask nodeLayer;
     private const int maxNodesForScan = 15;
@@ -18,6 +20,8 @@ public class ParkourManager : MonoBehaviour
 
     private PlayerContext ctx;
     private CharacterController controller;
+    private Animator animator;
+    private ParkourAnimatorIKBridge ikBridge;
 
     private ParkourNode currentNode = null;
     private Vector3 currentAnchorPoint = Vector3.zero;
@@ -41,6 +45,8 @@ public class ParkourManager : MonoBehaviour
     {
         ctx = GetComponent<PlayerContext>();
         controller = GetComponent<CharacterController>();
+        animator = GetComponentInChildren<Animator>();
+        ikBridge = GetComponentInChildren<ParkourAnimatorIKBridge>();
         nodeLayer = LayerMask.GetMask(ParkourNode.LayerName);
     }
 
@@ -52,6 +58,16 @@ public class ParkourManager : MonoBehaviour
         Shimmy();
         DropFromHanging();
         TransferIfClimbing();
+
+        if (ctx.State == PlayerState.Hanging)
+        {
+            var (left, right) = CalculatePointForArms(currentAnchorPoint - hangingOffset, currentNode);
+            ikBridge.SetPositionsForHands(left, right);
+        }
+        else
+        {
+            ikBridge.ResetAll();
+        }
     }
 
     private void ScanDropDownShimmyLedge()
@@ -253,9 +269,9 @@ public class ParkourManager : MonoBehaviour
             }
             else if (inputY > 0)
             {
-                if (CanClimbUp(out var posToTransfer))
+                if (CanClimbUp(out var posToTransfer, out var ledgePointForArms))
                 {
-                    ClimbUp(posToTransfer);
+                    ClimbUp(posToTransfer, ledgePointForArms);
                 }
             }
             return;
@@ -273,23 +289,26 @@ public class ParkourManager : MonoBehaviour
         TransferToNextLedge(bestEdge.TargetNode);
     }
 
-    private bool CanClimbUp(out Vector3 posToTransfer)
+    private bool CanClimbUp(out Vector3 posToTransfer, out Vector3 ledgePointForArms)
     {
         posToTransfer = Vector3.zero;
-        Vector3 ledgePointForArms = currentNode.PointAtProject(transform.position);
+        ledgePointForArms = Vector3.zero;
 
-        Vector3 newPlayerPos = ledgePointForArms - currentNode.GlobalNormal * controller.radius;
+        Vector3 rawLedgePointForArms = currentNode.PointAtProject(transform.position);
 
-        if (Physics.CheckBox(ledgePointForArms + (controller.height / 2 + 0.05f) * Vector3.up, new(controller.radius, controller.height / 2, controller.radius), transform.rotation, obstacleLayerMask))
+        Vector3 newPlayerPos = rawLedgePointForArms - currentNode.GlobalNormal * controller.radius;
+
+        if (Physics.CheckBox(rawLedgePointForArms + (controller.height / 2 + 0.05f) * Vector3.up, new(controller.radius, controller.height / 2, controller.radius), transform.rotation, obstacleLayerMask))
         {
             return false;
         }
 
         posToTransfer = newPlayerPos;
+        ledgePointForArms = rawLedgePointForArms;
         return true;
     }
 
-    private void ClimbUp(Vector3 posToTransfer)
+    private void ClimbUp(Vector3 posToTransfer, Vector3 ledgePointForArms)
     {
         currentAnchorPoint = posToTransfer;
         ctx.State = PlayerState.Climbing;
@@ -328,6 +347,7 @@ public class ParkourManager : MonoBehaviour
         Vector3 newPos = transform.position + move;
         float newPosProj = currentNode.Project(newPos);
         newPos = currentNode.PointAt(newPosProj) + hangingOffset;
+        currentAnchorPoint = newPos;
 
         controller.enabled = false;
         transform.position = newPos;
@@ -378,6 +398,15 @@ public class ParkourManager : MonoBehaviour
         if (transform.position == targetPos && transform.rotation == targetRot)
         {
             ctx.State = currentNode != null ? PlayerState.Hanging : PlayerState.Idle;
+
+            if (ctx.State == PlayerState.Hanging)
+            {
+                if (animator != null)
+                {
+                    animator.CrossFade("Hanging Idle", 0.15f);
+                }
+            }
+
             return;
         }
 
@@ -387,6 +416,21 @@ public class ParkourManager : MonoBehaviour
         controller.enabled = false;
         transform.SetPositionAndRotation(newPos, newRot);
         controller.enabled = true;
+    }
+
+    private (Vector3 left, Vector3 right) CalculatePointForArms(Vector3 currentLedgePointForArms, ParkourNode node)
+    {
+        float distance = handLength;
+        if (node.Length != 0)
+        {
+            float rawDistance = node.Length / 2f;
+            distance = Mathf.Clamp(rawDistance, 0, shoulderLength / 2f);
+        }
+
+        Vector3 left = currentLedgePointForArms - node.Right * distance;
+        Vector3 right = currentLedgePointForArms + node.Right * distance;
+
+        return (left, right);
     }
 
     private void OnDrawGizmos()
