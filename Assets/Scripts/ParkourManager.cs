@@ -21,7 +21,7 @@ public class ParkourManager : MonoBehaviour
     private PlayerContext ctx;
     private CharacterController controller;
     private Animator animator;
-    private ParkourAnimatorIKBridge ikBridge;
+    private ParkourAnimatorBridge animBridge;
 
     private ParkourNode currentNode = null;
     private Vector3 currentAnchorPoint = Vector3.zero;
@@ -46,7 +46,7 @@ public class ParkourManager : MonoBehaviour
         ctx = GetComponent<PlayerContext>();
         controller = GetComponent<CharacterController>();
         animator = GetComponentInChildren<Animator>();
-        ikBridge = GetComponentInChildren<ParkourAnimatorIKBridge>();
+        animBridge = GetComponentInChildren<ParkourAnimatorBridge>();
         nodeLayer = LayerMask.GetMask(ParkourNode.LayerName);
     }
 
@@ -62,11 +62,11 @@ public class ParkourManager : MonoBehaviour
         if (ctx.State == PlayerState.Hanging)
         {
             var (left, right) = CalculatePointForArms(currentAnchorPoint - hangingOffset, currentNode);
-            ikBridge.SetPositionsForHands(left, right);
+            animBridge.SetPositionsForHands(left, right);
         }
         else
         {
-            ikBridge.ResetAll();
+            animBridge.ResetHandsIK();
         }
     }
 
@@ -269,9 +269,9 @@ public class ParkourManager : MonoBehaviour
             }
             else if (inputY > 0)
             {
-                if (CanClimbUp(out var posToTransfer, out var ledgePointForArms))
+                if (CanClimbUp(out var posToTransfer))
                 {
-                    ClimbUp(posToTransfer, ledgePointForArms);
+                    ClimbUp(posToTransfer);
                 }
             }
             return;
@@ -289,13 +289,10 @@ public class ParkourManager : MonoBehaviour
         TransferToNextLedge(bestEdge.TargetNode);
     }
 
-    private bool CanClimbUp(out Vector3 posToTransfer, out Vector3 ledgePointForArms)
+    private bool CanClimbUp(out Vector3 posToTransfer)
     {
         posToTransfer = Vector3.zero;
-        ledgePointForArms = Vector3.zero;
-
         Vector3 rawLedgePointForArms = currentNode.PointAtProject(transform.position);
-
         Vector3 newPlayerPos = rawLedgePointForArms - currentNode.GlobalNormal * controller.radius;
 
         if (Physics.CheckBox(rawLedgePointForArms + (controller.height / 2 + 0.05f) * Vector3.up, new(controller.radius, controller.height / 2, controller.radius), transform.rotation, obstacleLayerMask))
@@ -304,15 +301,20 @@ public class ParkourManager : MonoBehaviour
         }
 
         posToTransfer = newPlayerPos;
-        ledgePointForArms = rawLedgePointForArms;
         return true;
     }
 
-    private void ClimbUp(Vector3 posToTransfer, Vector3 ledgePointForArms)
+    private void ClimbUp(Vector3 posToTransfer)
     {
         currentAnchorPoint = posToTransfer;
+        Debug.DrawRay(currentAnchorPoint, Vector3.up, Color.red, 5);
+        animBridge.SetCurrentAnchorPoint(currentAnchorPoint);
         ctx.State = PlayerState.Climbing;
         currentNode = null;
+        if (animator != null)
+        {
+            animator.CrossFade("Climbing", 0.15f);
+        }
     }
 
     private void Shimmy()
@@ -387,7 +389,7 @@ public class ParkourManager : MonoBehaviour
 
     private void TransferIfClimbing()
     {
-        if (ctx.State != PlayerState.Climbing)
+        if (ctx.State != PlayerState.Climbing || currentNode == null)
         {
             return;
         }

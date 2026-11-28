@@ -45,7 +45,7 @@ public class Locomotion : MonoBehaviour
     private static readonly int LocomotionHash = Animator.StringToHash("Locomotion");
 
     private Animator animator;
-    private ParkourAnimatorIKBridge ikBridge;
+    private ParkourAnimatorBridge animBridge;
     private CharacterController controller;
     private PlayerContext ctx;
 
@@ -80,7 +80,7 @@ public class Locomotion : MonoBehaviour
     private void Awake()
     {
         animator = GetComponentInChildren<Animator>();
-        ikBridge = GetComponentInChildren<ParkourAnimatorIKBridge>();
+        animBridge = GetComponentInChildren<ParkourAnimatorBridge>();
         controller = GetComponent<CharacterController>();
         ctx = GetComponent<PlayerContext>();
         nodeLayer = LayerMask.GetMask(ParkourNode.LayerName);
@@ -131,7 +131,7 @@ public class Locomotion : MonoBehaviour
         {
             animator.CrossFade(LocomotionHash, 0.15f);
             animator.SetFloat("Speed", 0f);
-            ikBridge.ResetAll();
+            animBridge.ResetAll();
         }
 
         Vector3 moveVec = GetCameraRelativeMoveInput();

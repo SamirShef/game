@@ -1,9 +1,10 @@
 using UnityEngine;
 
 [RequireComponent(typeof(Animator))]
-class ParkourAnimatorIKBridge : MonoBehaviour
+class ParkourAnimatorBridge : MonoBehaviour
 {
     private ParkourManager parkourManager;
+    private CharacterController controller;
     private PlayerContext ctx;
     private Animator animator;
 
@@ -12,9 +13,12 @@ class ParkourAnimatorIKBridge : MonoBehaviour
     private Vector3 leftHandTarget = Vector3.zero;
     private Vector3 rightHandTarget = Vector3.zero;
 
+    private Vector3 currentAnchorPoint = Vector3.zero;
+
     private void Awake()
     {
         parkourManager = GetComponentInParent<ParkourManager>();
+        controller = GetComponentInParent<CharacterController>();
         ctx = GetComponentInParent<PlayerContext>();
         animator = GetComponent<Animator>();
     }
@@ -27,12 +31,37 @@ class ParkourAnimatorIKBridge : MonoBehaviour
         rightHandTarget = right;
     }
 
-    public void ResetAll()
+    public void SetCurrentAnchorPoint(Vector3 anchorPoint)
+    {
+        currentAnchorPoint = anchorPoint;
+    }
+
+    public void ClimbUp()
+    {
+        controller.enabled = false;
+        transform.parent.position = currentAnchorPoint;
+        controller.enabled = true;
+        ctx.State = PlayerState.Idle;
+        ResetCurrentAnchorPoint();
+    }
+
+    public void ResetCurrentAnchorPoint()
+    {
+        currentAnchorPoint = Vector3.zero;
+    }
+
+    public void ResetHandsIK()
     {
         leftHandIKWeight = 0f;
         rightHandIKWeight = 0f;
         leftHandTarget = Vector3.zero;
         rightHandTarget = Vector3.zero;
+    }
+
+    public void ResetAll()
+    {
+        ResetCurrentAnchorPoint();
+        ResetHandsIK();
     }
 
     private void OnAnimatorIK(int layerIndex)
@@ -49,5 +78,12 @@ class ParkourAnimatorIKBridge : MonoBehaviour
                     break;
             }
         }
+    }
+
+    private void OnAnimatorMove()
+    {
+        controller.enabled = false;
+        transform.parent.position += animator.deltaPosition;
+        controller.enabled = true;
     }
 }
