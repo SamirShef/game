@@ -11,6 +11,7 @@ public class ParkourManager : MonoBehaviour
     [SerializeField] private Vector3 hangingOffset = new(0f, -1.8f, 0f);
     [SerializeField] private float handLength = 0.1f;
     [SerializeField] private float shoulderLength = 0.5f;
+    [SerializeField] private float minDistanceToJumpLeftRightInHanging = 1.5f;
     private const float boxForwardDistance = 1.5f;
     private LayerMask nodeLayer;
     private const int maxNodesForScan = 15;
@@ -29,6 +30,8 @@ public class ParkourManager : MonoBehaviour
     private const float transferMovingSpeed = 3f;
     private const float shimmySpeed = 2f;
 
+    private bool rootMotionWorks = false;
+
     private struct ParkourEdgeCandidate
     {
         public ParkourEdge Edge;
@@ -39,6 +42,11 @@ public class ParkourManager : MonoBehaviour
             Edge = edge;
             Score = score;
         }
+    }
+
+    public void RootMotionNotWorks()
+    {
+        rootMotionWorks = false;
     }
 
     private void Awake()
@@ -52,6 +60,20 @@ public class ParkourManager : MonoBehaviour
 
     private void Update()
     {
+        if (rootMotionWorks && !animator.IsInTransition(0))
+        {
+            MatchTargetWeightMask positionMask = new(Vector3.one, 0f);
+
+            animator.MatchTarget(
+                currentAnchorPoint,
+                Quaternion.LookRotation(-currentNode.GlobalNormal),
+                AvatarTarget.Root,
+                positionMask,
+                0.15f,
+                0.55f
+            );
+        }
+
         ScanDropDownShimmyLedge();
         ScanWallToLedges();
         ScanNextLedgeOnWall();
@@ -59,14 +81,15 @@ public class ParkourManager : MonoBehaviour
         DropFromHanging();
         TransferIfClimbing();
 
-        if (ctx.State == PlayerState.Hanging)
+        if (ctx.State == PlayerState.Hanging || ctx.State == PlayerState.Climbing)
         {
-            var (left, right) = CalculatePointForArms(currentAnchorPoint - hangingOffset, currentNode);
-            animBridge.SetPositionsForHands(left, right);
+            // var (left, right) = CalculatePointForArms(currentAnchorPoint - hangingOffset, currentNode);
+            // animBridge.SetPositionsForHands(left, right);
+            // animBridge.ApplyHandIK();
         }
         else
         {
-            animBridge.ResetHandsIK();
+            animBridge.ResetHandIK();
         }
     }
 
@@ -364,8 +387,32 @@ public class ParkourManager : MonoBehaviour
             return;
         }
 
+        var (oldLeft, oldRight) = CalculatePointForArms(currentAnchorPoint - hangingOffset, bestNode);
+
         currentNode = bestNode;
         currentAnchorPoint = currentNode.PointAtProject(transform.position) + hangingOffset;
+
+        Vector3 toNextNode = currentAnchorPoint - transform.position;
+        float dot = Vector3.Dot(toNextNode.normalized, transform.right);
+        if (Mathf.Abs(dot) >= 0.7 && toNextNode.magnitude >= minDistanceToJumpLeftRightInHanging)
+        {
+            if (animator != null)
+            {
+                var (newLeft, newRight) = CalculatePointForArms(currentAnchorPoint - hangingOffset, bestNode);
+                animBridge.SetPositionsForHandsOld(oldLeft, oldRight);
+                animBridge.SetPositionsForHandsNext(newLeft, newRight);
+                if (Mathf.Sign(dot) == 1f)
+                {
+                    animator.CrossFade("Braced Hang Hop Right", 0.15f);
+                }
+                else
+                {
+                    animator.CrossFade("Braced Hang Hop Left", 0.15f);
+                }
+                rootMotionWorks = true;
+            }
+        }
+
         ctx.State = PlayerState.Climbing;
     }
 
@@ -389,26 +436,24 @@ public class ParkourManager : MonoBehaviour
 
     private void TransferIfClimbing()
     {
-        if (ctx.State != PlayerState.Climbing || currentNode == null)
+        if (ctx.State != PlayerState.Climbing || currentNode == null || rootMotionWorks)
         {
             return;
         }
 
-        Quaternion targetRot = currentNode != null ? Quaternion.LookRotation(-currentNode.GlobalNormal) : transform.rotation;
+        Quaternion targetRot = Quaternion.LookRotation(-currentNode.GlobalNormal);
         Vector3 targetPos = currentAnchorPoint;
 
         if (transform.position == targetPos && transform.rotation == targetRot)
         {
-            ctx.State = currentNode != null ? PlayerState.Hanging : PlayerState.Idle;
-
-            if (ctx.State == PlayerState.Hanging)
+            ctx.State = PlayerState.Hanging;
+            if (animator != null)
             {
-                if (animator != null)
-                {
-                    animator.CrossFade("Hanging Idle", 0.15f);
-                }
+                var (left, right) = CalculatePointForArms(currentAnchorPoint - hangingOffset, currentNode);
+                animBridge.SetPositionsForHands(left, right);
+                animBridge.ApplyHandIK();
+                animator.CrossFade("Hanging Idle", 0.15f);
             }
-
             return;
         }
 
